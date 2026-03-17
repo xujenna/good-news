@@ -489,6 +489,8 @@
     const linkEsc = escHtml(item.link).replace(/"/g, '&quot;');
     return `
       <article class="feed-item" data-item-link="${linkEsc}">
+        <div class="swipe-hint swipe-hint-save" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></div>
+        <div class="swipe-hint swipe-hint-dismiss" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div>
         <div class="feed-item-link" role="button" tabindex="0" data-open-lightbox aria-label="Read article"></div>
         <div class="feed-item-inner">
           <div class="feed-item-text">
@@ -855,6 +857,88 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
   }
+
+  // ── Swipe gestures (mobile)
+  const SWIPE_THRESHOLD = 72;
+  let swipeState = null;
+
+  document.getElementById('items').addEventListener('touchstart', (e) => {
+    if (e.target.closest('.source-badge, .topic-tag, .item-action-btn')) return;
+    const article = e.target.closest('.feed-item');
+    if (!article) return;
+    const t = e.touches[0];
+    swipeState = { article, startX: t.clientX, startY: t.clientY, tracking: false, deltaX: 0 };
+  }, { passive: true });
+
+  document.getElementById('items').addEventListener('touchmove', (e) => {
+    if (!swipeState) return;
+    const t = e.touches[0];
+    const dx = t.clientX - swipeState.startX;
+    const dy = t.clientY - swipeState.startY;
+    if (!swipeState.tracking) {
+      if (Math.abs(dy) > Math.abs(dx)) { swipeState = null; return; }
+      if (Math.abs(dx) < 6) return;
+      swipeState.tracking = true;
+    }
+    e.preventDefault();
+    swipeState.deltaX = dx;
+    const { article } = swipeState;
+    article.querySelector('.feed-item-inner').style.transform = `translateX(${dx}px)`;
+    article.classList.add('feed-item-dragging');
+    const pct = Math.min(1, Math.abs(dx) / SWIPE_THRESHOLD);
+    article.querySelector('.swipe-hint-save').style.opacity    = dx > 0 ? pct : 0;
+    article.querySelector('.swipe-hint-dismiss').style.opacity = dx < 0 ? pct : 0;
+  }, { passive: false });
+
+  function swipeSnapBack(article) {
+    article.classList.remove('feed-item-dragging');
+    const inner = article.querySelector('.feed-item-inner');
+    inner.style.transform = '';
+    article.querySelector('.swipe-hint-save').style.opacity    = 0;
+    article.querySelector('.swipe-hint-dismiss').style.opacity = 0;
+  }
+
+  document.getElementById('items').addEventListener('touchend', () => {
+    if (!swipeState || !swipeState.tracking) { swipeState = null; return; }
+    const { article, deltaX } = swipeState;
+    swipeState = null;
+    const url = article.dataset.itemLink;
+    const inner = article.querySelector('.feed-item-inner');
+
+    if (deltaX > SWIPE_THRESHOLD) {
+      // swipe right → save
+      const item = allItems.find(i => i.link === url) || getSavedItems().find(i => i.link === url);
+      if (item) {
+        const nowSaved = toggleSaved(item);
+        inner.style.transform = `translateX(${window.innerWidth}px)`;
+        article.classList.remove('feed-item-dragging');
+        setTimeout(() => {
+          inner.style.transform = '';
+          const btn = article.querySelector('.item-action-btn[data-action="save"]');
+          if (btn) { btn.innerHTML = nowSaved ? BOOKMARK_FILLED : BOOKMARK_ICON; btn.classList.toggle('item-saved', nowSaved); }
+          if (viewSaved && !nowSaved) renderItems();
+        }, 280);
+      } else {
+        swipeSnapBack(article);
+      }
+    } else if (deltaX < -SWIPE_THRESHOLD) {
+      // swipe left → dismiss
+      inner.style.transform = `translateX(-${window.innerWidth}px)`;
+      article.classList.remove('feed-item-dragging');
+      setTimeout(() => {
+        hideItem(url);
+        allItems = allItems.filter(i => i.link !== url);
+        renderItems();
+      }, 280);
+    } else {
+      swipeSnapBack(article);
+    }
+  });
+
+  document.getElementById('items').addEventListener('touchcancel', () => {
+    if (swipeState?.article) swipeSnapBack(swipeState.article);
+    swipeState = null;
+  });
 
   // ── Init
   loadSources();
