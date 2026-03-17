@@ -859,7 +859,9 @@
   }
 
   // ── Swipe gestures (mobile)
-  const SWIPE_THRESHOLD = 72;
+  // Icon appears at PEEK_THRESHOLD; action only triggers past ACTION_THRESHOLD
+  const PEEK_THRESHOLD   = 65;
+  const ACTION_THRESHOLD = 200;
   let swipeState = null;
 
   document.getElementById('items').addEventListener('touchstart', (e) => {
@@ -885,17 +887,27 @@
     const { article } = swipeState;
     article.querySelector('.feed-item-inner').style.transform = `translateX(${dx}px)`;
     article.classList.add('feed-item-dragging');
-    const pct = Math.min(1, Math.abs(dx) / SWIPE_THRESHOLD);
+    // Icon fades in between 0 and PEEK_THRESHOLD; stays fully visible beyond
+    const pct = Math.min(1, Math.abs(dx) / PEEK_THRESHOLD);
     article.querySelector('.swipe-hint-save').style.opacity    = dx > 0 ? pct : 0;
     article.querySelector('.swipe-hint-dismiss').style.opacity = dx < 0 ? pct : 0;
   }, { passive: false });
 
   function swipeSnapBack(article) {
     article.classList.remove('feed-item-dragging');
-    const inner = article.querySelector('.feed-item-inner');
-    inner.style.transform = '';
+    article.querySelector('.feed-item-inner').style.transform  = '';
     article.querySelector('.swipe-hint-save').style.opacity    = 0;
     article.querySelector('.swipe-hint-dismiss').style.opacity = 0;
+  }
+
+  function swipeCommit(article, direction) {
+    // direction: 1 = right (save), -1 = left (dismiss)
+    const inner = article.querySelector('.feed-item-inner');
+    // Reset hints before the fly-out so they don't linger
+    article.querySelector('.swipe-hint-save').style.opacity    = 0;
+    article.querySelector('.swipe-hint-dismiss').style.opacity = 0;
+    inner.style.transform = `translateX(${direction * window.innerWidth}px)`;
+    article.classList.remove('feed-item-dragging');
   }
 
   document.getElementById('items').addEventListener('touchend', () => {
@@ -903,17 +915,15 @@
     const { article, deltaX } = swipeState;
     swipeState = null;
     const url = article.dataset.itemLink;
-    const inner = article.querySelector('.feed-item-inner');
 
-    if (deltaX > SWIPE_THRESHOLD) {
+    if (deltaX > ACTION_THRESHOLD) {
       // swipe right → save
       const item = allItems.find(i => i.link === url) || getSavedItems().find(i => i.link === url);
       if (item) {
         const nowSaved = toggleSaved(item);
-        inner.style.transform = `translateX(${window.innerWidth}px)`;
-        article.classList.remove('feed-item-dragging');
+        swipeCommit(article, 1);
         setTimeout(() => {
-          inner.style.transform = '';
+          article.querySelector('.feed-item-inner').style.transform = '';
           const btn = article.querySelector('.item-action-btn[data-action="save"]');
           if (btn) { btn.innerHTML = nowSaved ? BOOKMARK_FILLED : BOOKMARK_ICON; btn.classList.toggle('item-saved', nowSaved); }
           if (viewSaved && !nowSaved) renderItems();
@@ -921,10 +931,9 @@
       } else {
         swipeSnapBack(article);
       }
-    } else if (deltaX < -SWIPE_THRESHOLD) {
+    } else if (deltaX < -ACTION_THRESHOLD) {
       // swipe left → dismiss
-      inner.style.transform = `translateX(-${window.innerWidth}px)`;
-      article.classList.remove('feed-item-dragging');
+      swipeCommit(article, -1);
       setTimeout(() => {
         hideItem(url);
         allItems = allItems.filter(i => i.link !== url);

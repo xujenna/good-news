@@ -561,7 +561,6 @@
       padding: 1.5rem 2rem;
       border-bottom: 1px solid var(--border);
       transition: background 0.1s;
-      overflow: hidden;
     }
 
     /* Swipe hints (mobile) */
@@ -577,6 +576,9 @@
     }
     .swipe-hint-save    { left: 0;  color: #4ade80; background: rgba(74,222,128,0.12); }
     .swipe-hint-dismiss { right: 0; color: var(--accent); background: rgba(255,60,0,0.10); }
+
+    /* Only clip content during an active swipe */
+    .feed-item.feed-item-dragging { overflow: hidden; }
 
     /* Slide transition — instant while dragging, animated on release */
     .feed-item-inner { transition: transform 0.28s ease; }
