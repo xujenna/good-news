@@ -432,6 +432,7 @@
     bar.style.display = 'flex';
     requestAnimationFrame(() => requestAnimationFrame(() => {
       const singleSetWidth = track.scrollWidth;
+      if (!singleSetWidth) return; // layout not ready (e.g. hidden on mobile) — skip to avoid ÷0
       // Repeat topics within each set until the set is wider than the viewport
       const repsPerSet = Math.max(1, Math.ceil((window.innerWidth + 1) / singleSetWidth));
       // Clear and rebuild with 2 sets, each containing repsPerSet repetitions
@@ -440,7 +441,6 @@
         for (let r = 0; r < repsPerSet; r++) buildSet();
       }
       const oneSetWidth = repsPerSet * singleSetWidth;
-      track.style.setProperty('--scroll-pct', '-50%');
       const tickerPxPerSec = 50;
       track.style.animationDuration = (oneSetWidth / tickerPxPerSec).toFixed(1) + 's';
     }));
