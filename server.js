@@ -441,7 +441,7 @@ app.get('/api/feed', async (req, res) => {
     const feed = await parser.parseURL(url.href);
     const name    = feed.title?.trim() || url.hostname;
     const siteUrl = feed.link?.trim()  || url.origin;
-    const items = feed.items.slice(0, 20).map(item => ({
+    const items = feed.items.map(item => ({
       source:    name,
       sourceUrl: siteUrl,
       category:  'custom',
@@ -473,7 +473,7 @@ app.get('/api/feeds', async (req, res) => {
   const results = await Promise.allSettled(
     feedSources.map(async source => {
       const feed = await parser.parseURL(source.feed);
-      return feed.items.slice(0, 20).map(item => ({
+      return feed.items.map(item => ({
         source: source.name,
         sourceUrl: source.url,
         category: source.category,
@@ -522,7 +522,7 @@ app.get('/api/ticker', async (req, res) => {
     const results = await Promise.allSettled(
       feedSources.map(async source => {
         const feed = await parser.parseURL(source.feed);
-        return feed.items.slice(0, 20).map(item => ({
+        return feed.items.map(item => ({
           source: source.name,
           sourceUrl: source.url,
           category: source.category,
