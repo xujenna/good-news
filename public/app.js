@@ -82,6 +82,20 @@
     localStorage.setItem(HIDDEN_ITEMS_KEY, JSON.stringify([...h]));
   }
 
+  const PERSISTED_ITEMS_KEY = 'wtaf-persisted-items';
+  function getPersistedItems() {
+    try { return JSON.parse(localStorage.getItem(PERSISTED_ITEMS_KEY) || '[]'); } catch { return []; }
+  }
+  function persistItems(items) {
+    const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
+    const read = getReadItems();
+    const hidden = getHiddenItems();
+    const keep = items
+      .filter(item => !read.has(item.link) && !hidden.has(item.link) && (!item.date || new Date(item.date).getTime() >= cutoff))
+      .map(({ content, ...rest }) => rest); // strip heavy content field to save space
+    try { localStorage.setItem(PERSISTED_ITEMS_KEY, JSON.stringify(keep)); } catch { /* storage full */ }
+  }
+
   const SAVED_ITEMS_KEY = 'wtaf-saved-items';
   function getSavedItems() {
     try { return JSON.parse(localStorage.getItem(SAVED_ITEMS_KEY) || '[]'); } catch { return []; }
@@ -328,12 +342,20 @@
             allItems.push(...r.value.items.filter(item => !hidden.includes(item.source)));
           }
         });
-        allItems.sort((a, b) => {
-          if (!a.date) return 1;
-          if (!b.date) return -1;
-          return new Date(b.date) - new Date(a.date);
-        });
       }
+
+      // Merge persisted unread items so articles aren't lost between cache refreshes
+      const freshLinks = new Set(allItems.map(i => i.link));
+      const carryOver = getPersistedItems().filter(i => !freshLinks.has(i.link) && !hidden.includes(i.source));
+      allItems = [...allItems, ...carryOver];
+
+      allItems.sort((a, b) => {
+        if (!a.date) return 1;
+        if (!b.date) return -1;
+        return new Date(b.date) - new Date(a.date);
+      });
+
+      persistItems(allItems);
 
       const updatedText = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
       document.getElementById('last-updated').textContent = updatedText;
