@@ -1043,6 +1043,7 @@
         z-index: 1002;
       }
       #menu-btn:hover { background: var(--surface); }
+      body:has(#lightbox.open) #menu-btn { display: none; }
     }
 
     @media (max-width: 600px) {
